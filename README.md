@@ -1,34 +1,98 @@
 # Qualitative Analysis Toolkit
 
-Python toolkit for **phenomenological and thematic analysis** — parses MAXQDA `.qdpx` exports via the REFI-QDA open standard, generates structured codebooks, and produces frequency/cross-tabulation reports.
+Hosted web application for **rigorous thematic analysis** following Braun & Clarke's (2006) six-phase framework. Features AI-guided workflow, transcript upload/paste, interactive coding, theme building, and publication-ready PDF/DOCX report generation.
 
 ## What it does
 
-- Parse `.qdpx` project exports from MAXQDA (REFI-QDA XML standard)
-- Build and validate codebooks programmatically
-- Generate coding frequency reports and source coverage matrices
-- Export thematic summaries with exemplar quotes
-- Visualise theme co-occurrence as a heatmap
+- **AI-Guided Analysis**: Claude AI walks you through all six phases of thematic analysis
+- **Data Input**: Paste text directly or upload transcripts (TXT, DOCX, PDF, CSV, Excel)
+- **Structured Workspace**: Phase-specific tools — source management, coding tables, theme builder, report preview
+- **Thematic Maps**: Auto-generated visual maps (initial → refined → final)
+- **Publication Outputs**: Downloadable PDF reports with embedded maps and visuals, plus DOCX for Word users
+- **MAXQDA Compatible**: Still parses `.qdpx` REFI-QDA exports via `analyse.py`
 
-## Quickstart
+## Architecture
+
+```
+React SPA (Vite + Tailwind)  <--->  FastAPI (Python)
+  Chat/Workspace UI                  PostgreSQL / SQLite
+  Phase-specific panels              Anthropic Claude API
+  File upload & paste                PDF/DOCX/Map generation
+```
+
+## Local Development
+
+### Backend
 
 ```bash
 pip install -r requirements.txt
+uvicorn backend.app.main:app --reload
+```
+
+The API runs at `http://localhost:8000`. Set `ANTHROPIC_API_KEY` in a `.env` file (see `.env.example`).
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The UI runs at `http://localhost:3000` and proxies API calls to `:8000`.
+
+### Build for production
+
+```bash
+cd frontend
+npm run build
+```
+
+Static files are output to `frontend/dist/` and served by the FastAPI app.
+
+## Railway Deployment
+
+1. **Create a Railway project** and connect your GitHub repo.
+2. **Add environment variables** in Railway Dashboard:
+   - `ANTHROPIC_API_KEY` — required for AI analysis
+   - `DATABASE_URL` — Railway Postgres URL (auto-provisioned)
+   - `REDIS_URL` — Railway Redis URL (optional, for Celery jobs)
+3. **Deploy** — `railway.json` configures the build and start commands.
+
+The app will:
+- Build the React frontend
+- Start FastAPI on the Railway-assigned `$PORT`
+- Serve API at `/api/*` and the SPA at `/`
+- Persist uploads and reports to a Railway volume mounted at `/data`
+
+## API Quick Reference
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/health` | GET | Health check |
+| `/api/projects/` | POST | Create project |
+| `/api/sources/upload` | POST | Upload transcript file |
+| `/api/sources/paste` | POST | Paste transcript text |
+| `/api/analysis/chat` | POST | Send phase chat message to AI |
+| `/api/analysis/generate-report/{id}` | POST | Generate PDF/DOCX report |
+
+## Legacy: MAXQDA Parser
+
+The original `analyse.py` script is still available for local REFI-QDA parsing:
+
+```bash
 python analyse.py --project sample_project.qdpx --output report/
 ```
 
-## Output
-
-| File | Description |
-|---|---|
-| `codebook.xlsx` | Full codebook - codes, definitions, frequencies, source counts |
-| `theme_matrix.xlsx` | Source x theme coverage matrix |
-| `coding_report.html` | Dark-theme interactive report with quote evidence |
-| `maxmaps_export.json` | Code relationship data for visualisation |
-
 ## Methods
 
-Supports Braun & Clarke thematic analysis and IPA (interpretive phenomenological analysis) write-up frameworks. Codebook structure follows REFI-QDA `.qdc` standard for round-trip import back into MAXQDA, NVivo, and Atlas.ti.
+Supports Braun & Clarke (2006) thematic analysis six-phase framework:
+1. Familiarisation with data
+2. Generating initial codes
+3. Searching for themes
+4. Reviewing themes
+5. Defining and naming themes
+6. Producing the report
 
 ## Author
 
