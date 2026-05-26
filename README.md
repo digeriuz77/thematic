@@ -4,7 +4,7 @@ Hosted web application for **rigorous thematic analysis** following Braun & Clar
 
 ## What it does
 
-- **AI-Guided Analysis**: Claude AI walks you through all six phases of thematic analysis
+- **AI-Guided Analysis**: Fireworks AI walks you through all six phases of thematic analysis
 - **Data Input**: Paste text directly or upload transcripts (TXT, DOCX, PDF, CSV, Excel)
 - **Structured Workspace**: Phase-specific tools — source management, coding tables, theme builder, report preview
 - **Thematic Maps**: Auto-generated visual maps (initial → refined → final)
@@ -16,7 +16,7 @@ Hosted web application for **rigorous thematic analysis** following Braun & Clar
 ```
 React SPA (Vite + Tailwind)  <--->  FastAPI (Python)
   Chat/Workspace UI                  PostgreSQL / SQLite
-  Phase-specific panels              Anthropic Claude API
+  Phase-specific panels              Fireworks AI API
   File upload & paste                PDF/DOCX/Map generation
 ```
 
@@ -29,7 +29,7 @@ pip install -r requirements.txt
 uvicorn backend.app.main:app --reload
 ```
 
-The API runs at `http://localhost:8000`. Set `ANTHROPIC_API_KEY` in a `.env` file (see `.env.example`).
+The API runs at `http://localhost:8000`. Set `FIREWORKS_API_KEY` in a `.env` file (see `.env.example`).
 
 ### Frontend
 
@@ -54,9 +54,10 @@ Static files are output to `frontend/dist/` and served by the FastAPI app.
 
 1. **Create a Railway project** and connect your GitHub repo.
 2. **Add environment variables** in Railway Dashboard:
-   - `ANTHROPIC_API_KEY` — required for AI analysis
-   - `DATABASE_URL` — Railway Postgres URL (auto-provisioned)
-   - `REDIS_URL` — Railway Redis URL (optional, for Celery jobs)
+    - `FIREWORKS_API_KEY` — required for AI analysis
+    - `FIREWORKS_MODEL` — model to use (default: accounts/fireworks/models/qwen3p6-plus)
+    - `DATABASE_URL` — Railway Postgres URL (auto-provisioned)
+    - `REDIS_URL` — Railway Redis URL (optional, for Celery jobs)
 3. **Deploy** — `railway.json` configures the build and start commands.
 
 The app will:

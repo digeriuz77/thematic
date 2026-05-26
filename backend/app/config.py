@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./thematic_analysis.db"
     redis_url: str = "redis://localhost:6379/0"
 
-    anthropic_api_key: str = ""
-    claude_model: str = "claude-3-5-sonnet-20241022"
+    fireworks_api_key: str = ""
+    fireworks_model: str = "accounts/fireworks/models/qwen3p6-plus"
 
     uploads_dir: str = "./data/uploads"
     reports_dir: str = "./data/reports"
