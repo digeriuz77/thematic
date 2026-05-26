@@ -11,7 +11,7 @@ The skill is grounded in one source:
 
 > Braun, V., & Clarke, V. (2006). Using thematic analysis in psychology. *Qualitative Research in Psychology, 3*(2), 77–101.
 
-Where this skill cites the paper, treat those statements as the method's published position, not Claude's own.
+Where this skill cites the paper, treat those statements as the method's published position, not the AI's own.
 
 ## Before you begin
 
