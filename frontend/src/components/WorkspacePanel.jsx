@@ -96,7 +96,7 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sources ({sources?.length || 0})</span>
               <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-400 transition hover:bg-indigo-500/20">
                 <Upload size={14} /> Upload File
-                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.docx,.pdf,.csv,.xlsx" />
+                <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.md,.docx,.pdf,.csv,.xlsx" />
               </label>
             </div>
             <div className="space-y-2">

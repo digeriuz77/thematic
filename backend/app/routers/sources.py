@@ -15,7 +15,7 @@ settings = get_settings()
 def extract_text_from_file(file_path: str, filename: str) -> str:
     ext = filename.lower().split('.')[-1] if '.' in filename else ''
 
-    if ext == 'txt':
+    if ext in ('txt', 'md', 'markdown'):
         with open(file_path, 'r', encoding='utf-8') as f:
             return f.read()
 

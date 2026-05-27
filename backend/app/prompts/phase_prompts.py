@@ -208,6 +208,9 @@ Return as structured JSON with 'source_notes' (array of {{name, summary}}) and '
 
 Research question: {rq}
 
+Familiarisation outputs from Phase 2:
+{json.dumps(prior_structured, indent=2) if prior_structured else 'No familiarisation notes have been saved yet.'}
+
 Sources to code:
 {source_text}
 
@@ -261,7 +264,7 @@ Return structured JSON with:
 - 'merged_themes': array of theme names that were combined
 - 'split_themes': array of themes that were divided
 - 'discarded_themes': array of themes that did not survive
-- 'review_notes': string summary of review decisions""",
+- 'review_notes': string summary of review decisions""" + current_state_text,
 
         6: f"""Phase 6: Defining and naming themes.
 
@@ -281,7 +284,7 @@ Write a one-paragraph synopsis using only theme names and definitions. If it doe
 Return structured JSON with:
 - 'final_themes': array of {{'name', 'definition', 'type': 'overarching|sub', 'parent_name', 'sub_themes': []}}
 - 'synopsis': string — the overall story paragraph
-- 'naming_notes': string — rationale for names chosen""",
+- 'naming_notes': string — rationale for names chosen""" + current_state_text,
 
         7: f"""Phase 7: Producing the report.
 
@@ -301,7 +304,7 @@ Use third person, hedged evidenced claims, active voice when describing analyst 
 Do not use passive constructions like 'themes emerged'.
 
 Return the full report text in a 'report_text' field.
-Also provide 'extracts_for_report': array of {{'theme_name', 'extract_text', 'commentary'}} for key illustrative quotes.""",
+Also provide 'extracts_for_report': array of {{'theme_name', 'extract_text', 'commentary'}} for key illustrative quotes.""" + current_state_text,
     }
 
     base_user_prompt = phase_prompts.get(phase_number, "Continue the thematic analysis.")

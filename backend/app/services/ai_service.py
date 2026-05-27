@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import ast
 import requests
 from typing import Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
@@ -18,10 +19,86 @@ class AIService:
     def __init__(self, db: Session):
         self.db = db
 
-    def _get_project_context(self, project: models.Project) -> Dict[str, Any]:
+    def _phase_label(self, phase_number: int) -> str:
+        phase_names = {
+            0: "Project Setup",
+            1: "Upfront Decisions",
+            2: "Familiarisation Notes",
+            3: "Codebook",
+            4: "Candidate Themes",
+            5: "Refined Themes",
+            6: "Final Themes",
+            7: "Manuscript Report",
+        }
+        return phase_names.get(phase_number, f"Phase {phase_number} Output")
+
+    def _extract_assistant_text_from_transcript(self, transcript: Optional[str]) -> str:
+        if not transcript:
+            return ""
+        try:
+            payload = json.loads(transcript)
+        except (TypeError, ValueError):
+            return ""
+        if not isinstance(payload, list):
+            return ""
+
+        assistant_chunks = []
+        for message in payload:
+            if not isinstance(message, dict):
+                continue
+            if message.get("role") != "assistant":
+                continue
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                assistant_chunks.append(content.strip())
+        return "\n\n".join(assistant_chunks)
+
+    def _state_to_structured_dict(self, state: Optional[models.PhaseState]) -> Dict[str, Any]:
+        if not state:
+            return {}
+
+        normalized = self._normalize_structured_data(state.phase_number, state.structured_data)
+        if normalized:
+            return normalized
+
+        assistant_text = self._extract_assistant_text_from_transcript(state.ai_transcript)
+        if not assistant_text:
+            return {}
+
+        parsed = self._extract_json(assistant_text)
+        recovered = self._normalize_structured_data(state.phase_number, parsed)
+        return recovered or {}
+
+    def _get_project_context(self, project: models.Project, phase_number: Optional[int] = None) -> Dict[str, Any]:
+        effective_phase = phase_number if phase_number is not None else (project.current_phase or 0)
+
+        previous_states = (
+            self.db.query(models.PhaseState)
+            .filter(models.PhaseState.project_id == project.id)
+            .filter(models.PhaseState.phase_number < effective_phase)
+            .order_by(models.PhaseState.phase_number.asc())
+            .all()
+        )
+        for state in previous_states:
+            try:
+                self.save_phase_data_to_file(
+                    project,
+                    state.phase_number,
+                    self._state_to_structured_dict(state),
+                    response_text=self._extract_assistant_text_from_transcript(state.ai_transcript),
+                )
+            except Exception as e:
+                print(f"Could not backfill phase output source for phase {state.phase_number}: {e}")
+
         user_sources = []
         system_outputs = []
-        for s in project.sources:
+        all_sources = (
+            self.db.query(models.Source)
+            .filter(models.Source.project_id == project.id)
+            .order_by(models.Source.created_at.asc())
+            .all()
+        )
+        for s in all_sources:
             src_dict = {"id": s.id, "name": s.name, "source_type": s.source_type, "content": s.content}
             if s.source_type == "phase_output":
                 system_outputs.append(src_dict)
@@ -29,67 +106,159 @@ class AIService:
                 user_sources.append(src_dict)
 
         prior_structured = {}
-        if project.current_phase > 0:
+        if effective_phase > 0:
             prev_state = (
                 self.db.query(models.PhaseState)
                 .filter(models.PhaseState.project_id == project.id)
-                .filter(models.PhaseState.phase_number == project.current_phase - 1)
+                .filter(models.PhaseState.phase_number == effective_phase - 1)
                 .first()
             )
-            if prev_state and prev_state.structured_data:
-                prior_structured = prev_state.structured_data
+            prior_structured = self._state_to_structured_dict(prev_state)
 
         current_state = (
             self.db.query(models.PhaseState)
             .filter(models.PhaseState.project_id == project.id)
-            .filter(models.PhaseState.phase_number == project.current_phase)
+            .filter(models.PhaseState.phase_number == effective_phase)
             .first()
         )
-        current_structured = current_state.structured_data if current_state and current_state.structured_data else {}
+        current_structured = self._state_to_structured_dict(current_state)
 
         return {
             "research_question": project.research_question,
             "analytic_decisions": project.analytic_decisions or {},
             "sources": user_sources,
             "system_outputs": system_outputs,
-            "current_phase": project.current_phase,
+            "current_phase": effective_phase,
             "prior_structured_data": prior_structured,
             "current_structured_data": current_structured,
         }
 
-    def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
-        """Extract and clean JSON block from assistant response to ensure flawless parsing and database saves."""
-        import re
-        import json
+    def _extract_json(self, text: str) -> Optional[Any]:
+        """Extract JSON-like content from assistant output and parse it robustly."""
+        if not text:
+            return None
 
-        def clean_json_string(s: str) -> str:
-            # Remove single-line JS comments (e.g., // comment)
-            s = re.sub(r"//.*$", "", s, flags=re.MULTILINE)
-            # Remove multi-line JS comments (e.g., /* comment */)
-            s = re.sub(r"/\*.*?\*/", "", s, flags=re.DOTALL)
-            # Remove trailing commas inside objects and arrays
-            s = re.sub(r",\s*([\]}])", r"\1", s)
-            return s.strip()
+        def clean_json_string(raw: str) -> str:
+            raw = re.sub(r"//.*$", "", raw, flags=re.MULTILINE)
+            raw = re.sub(r"/\*.*?\*/", "", raw, flags=re.DOTALL)
+            raw = re.sub(r",\s*([\]}])", r"\1", raw)
+            return raw.strip()
 
-        # Look for code blocks first
-        match = re.search(r"```json\s*(.*?)\s*```", text, re.DOTALL)
-        if match:
-            cleaned = clean_json_string(match.group(1))
+        def parse_candidate(candidate: str) -> Optional[Any]:
+            cleaned = clean_json_string(candidate)
+            if not cleaned:
+                return None
             try:
                 return json.loads(cleaned)
             except json.JSONDecodeError:
                 pass
-
-        # Look for general braces second
-        match = re.search(r"(\{.*\})", text, re.DOTALL)
-        if match:
-            cleaned = clean_json_string(match.group(1))
             try:
-                return json.loads(cleaned)
-            except json.JSONDecodeError:
-                pass
+                parsed = ast.literal_eval(cleaned)
+                if isinstance(parsed, (dict, list)):
+                    return parsed
+            except (ValueError, SyntaxError):
+                return None
+            return None
+
+        def iter_balanced_json_candidates(raw: str):
+            length = len(raw)
+            for start in range(length):
+                if raw[start] not in "{[":
+                    continue
+                stack = []
+                in_string = False
+                escaping = False
+                for idx in range(start, length):
+                    ch = raw[idx]
+                    if in_string:
+                        if escaping:
+                            escaping = False
+                        elif ch == "\\":
+                            escaping = True
+                        elif ch == "\"":
+                            in_string = False
+                        continue
+                    if ch == "\"":
+                        in_string = True
+                        continue
+                    if ch in "{[":
+                        stack.append(ch)
+                    elif ch in "}]":
+                        if not stack:
+                            break
+                        opener = stack.pop()
+                        if (opener == "{" and ch != "}") or (opener == "[" and ch != "]"):
+                            break
+                        if not stack:
+                            yield raw[start: idx + 1]
+                            break
+
+        fenced_blocks = re.findall(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.DOTALL | re.IGNORECASE)
+        for block in fenced_blocks:
+            parsed = parse_candidate(block)
+            if parsed is not None:
+                return parsed
+
+        for candidate in iter_balanced_json_candidates(text):
+            parsed = parse_candidate(candidate)
+            if parsed is not None:
+                return parsed
 
         return None
+
+    def _normalize_structured_data(self, phase_number: int, raw_data: Any) -> Optional[Dict[str, Any]]:
+        if raw_data is None:
+            return None
+
+        if isinstance(raw_data, str):
+            candidate = raw_data.strip()
+            if candidate:
+                parsed: Optional[Any] = None
+                try:
+                    parsed = json.loads(candidate)
+                except (TypeError, ValueError):
+                    try:
+                        parsed = ast.literal_eval(candidate)
+                    except (ValueError, SyntaxError):
+                        parsed = None
+                if parsed is not None:
+                    return self._normalize_structured_data(phase_number, parsed)
+
+        normalized: Optional[Dict[str, Any]] = None
+
+        if isinstance(raw_data, dict):
+            normalized = raw_data
+        elif isinstance(raw_data, list):
+            if phase_number == 2:
+                if all(isinstance(item, str) for item in raw_data):
+                    normalized = {"initial_ideas": raw_data}
+                else:
+                    normalized = {"source_notes": raw_data}
+            elif phase_number == 3:
+                normalized = {"codes": raw_data}
+            elif phase_number == 4:
+                normalized = {"candidate_themes": raw_data}
+            elif phase_number == 5:
+                normalized = {"refined_themes": raw_data}
+            elif phase_number == 6:
+                normalized = {"final_themes": raw_data}
+            elif phase_number == 7:
+                if all(isinstance(item, str) for item in raw_data):
+                    normalized = {"report_text": "\n".join(raw_data)}
+                else:
+                    normalized = {"extracts_for_report": raw_data}
+        elif isinstance(raw_data, str) and phase_number == 7:
+            if raw_data.strip():
+                normalized = {"report_text": raw_data.strip()}
+
+        if normalized is None:
+            return None
+
+        try:
+            healed = heal_structured_data(phase_number, normalized)
+            return healed if isinstance(healed, dict) else normalized
+        except Exception:
+            return normalized
 
     def run_phase_chat(
         self,
@@ -106,7 +275,7 @@ class AIService:
         system_prompt = build_system_prompt(phase_number)
 
         if len(messages) == 1 and messages[0].get("role") == "user":
-            context = self._get_project_context(project)
+            context = self._get_project_context(project, phase_number)
             phase_prompt = build_phase_user_prompt(phase_number, context)
             messages[0]["content"] = f"{messages[0]['content']}\n\n{phase_prompt}" if messages[0]["content"] else phase_prompt
 
@@ -130,17 +299,18 @@ class AIService:
             "Authorization": f"Bearer {settings.fireworks_api_key}",
         }
 
-        response = requests.post(FIREWORKS_API_URL, headers=headers, json=payload, timeout=120)
-        response.raise_for_status()
+        try:
+            response = requests.post(FIREWORKS_API_URL, headers=headers, json=payload, timeout=120)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            return (f"AI request failed: {exc}", None)
 
         response_data = response.json()
         response_text = response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
-        structured_data = self._extract_json(response_text)
-        if structured_data:
-            try:
-                structured_data = heal_structured_data(phase_number, structured_data)
-            except Exception as e:
-                print(f"Error healing structured data: {e}")
+        structured_data = self._normalize_structured_data(
+            phase_number,
+            self._extract_json(response_text)
+        )
 
         transcript = json.dumps(messages + [{"role": "assistant", "content": response_text}])
 
@@ -190,14 +360,13 @@ class AIService:
 
         self.db.commit()
 
-        # Write phase structured data as physical JSON and Markdown files to disk, register them as system sources,
-        # and synchronize them to the relational database tables!
-        if structured_data:
-            try:
-                self.save_phase_data_to_file(project, phase_number, structured_data)
+        # Write phase outputs as physical files and phase memory sources for downstream phases.
+        try:
+            self.save_phase_data_to_file(project, phase_number, structured_data, response_text=response_text)
+            if structured_data:
                 self.sync_structured_data_to_db(project, phase_number, structured_data)
-            except Exception as e:
-                print(f"Error saving/syncing phase data: {e}")
+        except Exception as e:
+            print(f"Error saving/syncing phase data: {e}")
 
         return response_text, structured_data
 
@@ -205,7 +374,7 @@ class AIService:
         """Programmatically validate that the required qualitative data for the given phase has been generated and saved."""
         errors = []
         
-        # Heal structured data dynamically using our structural shape-analyzing heuristic
+        # Normalize existing structured data into a safe dict shape for the validator
         state = (
             self.db.query(models.PhaseState)
             .filter(models.PhaseState.project_id == project.id)
@@ -214,8 +383,12 @@ class AIService:
         )
         if state and state.structured_data:
             try:
-                healed = heal_structured_data(phase_number, state.structured_data)
-                state.structured_data = healed
+                normalized = self._normalize_structured_data(phase_number, state.structured_data)
+                if normalized is None:
+                    return False, [
+                        "Saved structured data for this phase is malformed. Please regenerate this phase output."
+                    ]
+                state.structured_data = normalized
                 self.db.commit()
             except Exception as e:
                 print(f"Error healing state during validation: {e}")
@@ -508,33 +681,36 @@ class AIService:
 
         return len(errors) == 0, errors
 
-    def save_phase_data_to_file(self, project: models.Project, phase_number: int, structured_data: Dict[str, Any]):
-        """Save phase outputs as physical JSON/Markdown files in the uploads directory and connect them to project sources."""
-        phase_names = {
-            1: "Upfront Decisions",
-            2: "Familiarisation Notes",
-            3: "Codebook",
-            4: "Candidate Themes",
-            5: "Refined Themes",
-            6: "Final Themes",
-            7: "Manuscript Report"
-        }
-        
-        phase_label = phase_names.get(phase_number, f"Phase {phase_number} Output")
-        md_content = structured_data_to_markdown(phase_number, structured_data)
-        
+    def save_phase_data_to_file(
+        self,
+        project: models.Project,
+        phase_number: int,
+        structured_data: Optional[Dict[str, Any]],
+        response_text: Optional[str] = None,
+    ):
+        """Persist phase outputs as physical files and source memory used by later phases."""
+        phase_label = self._phase_label(phase_number)
+        normalized = self._normalize_structured_data(phase_number, structured_data) if structured_data else None
+
+        md_content = structured_data_to_markdown(phase_number, normalized) if normalized else ""
+        if not md_content.strip() and response_text and response_text.strip():
+            md_content = f"# {phase_label}\n\n{response_text.strip()}\n"
+        if not md_content.strip():
+            return
+
         # Write MD file
         md_filename = f"{project.id}_phase_{phase_number}_output.md"
         md_path = os.path.join(settings.uploads_dir, md_filename)
         with open(md_path, "w", encoding="utf-8") as f:
             f.write(md_content)
-            
-        # Write JSON file
-        json_filename = f"{project.id}_phase_{phase_number}_output.json"
-        json_path = os.path.join(settings.uploads_dir, json_filename)
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(structured_data, f, indent=2)
-            
+
+        # Write JSON file when structured output exists
+        if normalized:
+            json_filename = f"{project.id}_phase_{phase_number}_output.json"
+            json_path = os.path.join(settings.uploads_dir, json_filename)
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(normalized, f, indent=2)
+
         # Check if the Source record already exists for this system phase output
         db_source = (
             self.db.query(models.Source)
@@ -543,7 +719,7 @@ class AIService:
             .filter(models.Source.name == f"System - {phase_label}")
             .first()
         )
-        
+
         if db_source:
             db_source.content = md_content
             db_source.file_path = md_path
@@ -556,7 +732,7 @@ class AIService:
                 file_path=md_path
             )
             self.db.add(db_source)
-            
+
         self.db.commit()
 
     def sync_structured_data_to_db(self, project: models.Project, phase_number: int, data: Dict[str, Any]):
@@ -946,4 +1122,4 @@ def heal_structured_data(phase_number: int, data: dict) -> dict:
                     if parent_key and parent_key != "parent_name":
                         t["parent_name"] = t.pop(parent_key)
                         
-    return data
+    return data

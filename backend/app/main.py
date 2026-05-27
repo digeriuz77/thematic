@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -57,8 +57,8 @@ if os.path.exists(frontend_build_dir):
     @app.get("/{path:path}")
     async def serve_frontend(path: str, request: Request):
         # Don't interfere with API routes
-        if path.startswith("api/"):
-            return {"detail": "Not Found"}
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
         # Serve index.html for all non-API, non-asset routes (SPA routing)
         index_path = os.path.join(frontend_build_dir, "index.html")
         return FileResponse(index_path)
