@@ -72,63 +72,72 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
   if (phase <= 1) {
     return (
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="border-b border-accent/10 px-4 py-3">
-          <h3 className="text-sm font-bold text-accent uppercase tracking-wider flex items-center gap-2">
-            <BookOpen size={14} /> Data Corpus
+        <div className="border-b border-white/5 bg-slate-900/40 px-6 py-4">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+            <BookOpen size={16} /> Data Corpus
           </h3>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Research Question */}
-          <div className="rounded-lg border border-accent/10 bg-bg p-3">
-            <label className="text-xs font-semibold text-muted uppercase mb-1 block">Research Question</label>
+          <div className="rounded-2xl border border-white/5 bg-slate-900/40 p-5 glass-panel">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Research Question</label>
             <textarea
               defaultValue={project.research_question || ''}
               onBlur={e => updateMutation.mutate({ id: project.id, data: { research_question: e.target.value } })}
               rows={2}
-              className="w-full rounded-lg px-3 py-2 text-sm"
+              className="w-full rounded-xl bg-slate-950/50 border border-white/10 px-4 py-3 text-sm text-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition duration-200"
               placeholder="Enter your research question..."
             />
           </div>
 
           {/* Sources list */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted uppercase">Sources ({sources?.length || 0})</span>
-              <label className="flex cursor-pointer items-center gap-1 rounded-lg bg-accent/10 px-2 py-1 text-xs font-medium text-accent transition hover:bg-accent/20">
-                <Upload size={12} /> Upload File
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sources ({sources?.length || 0})</span>
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-400 transition hover:bg-indigo-500/20">
+                <Upload size={14} /> Upload File
                 <input type="file" className="hidden" onChange={handleFileUpload} accept=".txt,.docx,.pdf,.csv,.xlsx" />
               </label>
             </div>
-            {sources?.map(source => (
-              <div key={source.id} className="flex items-center justify-between rounded-lg border border-accent/10 bg-bg p-2 text-sm">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText size={14} className="text-accent shrink-0" />
-                  <span className="truncate">{source.name}</span>
-                  <span className="text-xs text-muted shrink-0">({source.source_type})</span>
+            <div className="space-y-2">
+              {sources?.map(source => (
+                <div key={source.id} className="group flex items-center justify-between rounded-xl border border-white/5 bg-slate-900/30 p-3 text-sm transition hover:bg-slate-900/50 hover:border-indigo-500/20">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
+                      <FileText size={16} />
+                    </div>
+                    <span className="truncate font-medium text-slate-200">{source.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-500 shrink-0 font-medium bg-slate-950/50 px-2 py-0.5 rounded-md border border-white/5">{source.source_type}</span>
+                  </div>
+                  {source.source_type !== 'phase_output' ? (
+                    <button onClick={() => deleteMutation.mutate(source.id)} className="text-slate-500 hover:text-rose-400 transition shrink-0 opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-rose-500/10">
+                      <Trash2 size={16} />
+                    </button>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wider text-indigo-400/70 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-500/20 shrink-0 font-medium">Memory File</span>
+                  )}
                 </div>
-                <button onClick={() => deleteMutation.mutate(source.id)} className="text-muted hover:text-red transition shrink-0">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Paste text */}
-          <form onSubmit={handlePasteSubmit} className="space-y-2">
-            <input name="name" type="text" placeholder="Source name..." className="w-full rounded-lg px-3 py-2 text-sm" />
-            <textarea name="content" rows={4} placeholder="Paste transcript text here..." className="w-full rounded-lg px-3 py-2 text-sm resize-none" />
-            <button type="submit" className="flex items-center gap-1 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20">
-              <Plus size={12} /> Add Source
+          <form onSubmit={handlePasteSubmit} className="space-y-3 rounded-2xl border border-white/5 bg-slate-900/40 p-5 glass-panel">
+            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Paste Raw Text</h4>
+            <input name="name" type="text" placeholder="Source name..." className="w-full rounded-xl bg-slate-950/50 border border-white/10 px-4 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition duration-200" />
+            <textarea name="content" rows={4} placeholder="Paste transcript text here..." className="w-full rounded-xl bg-slate-950/50 border border-white/10 px-4 py-3 text-sm text-slate-200 resize-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition duration-200" />
+            <button type="submit" className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 px-4 py-2.5 text-xs font-semibold text-indigo-400 transition hover:bg-indigo-500/20">
+              <Plus size={14} /> Add Source
             </button>
           </form>
 
           {/* Analytic Decisions */}
           {phase === 1 && (
-            <div className="rounded-lg border border-accent/10 bg-bg p-3 space-y-3">
-              <h4 className="text-xs font-bold text-accent uppercase tracking-wider">Four Upfront Decisions</h4>
+            <div className="rounded-2xl border border-white/5 bg-slate-900/40 p-5 glass-panel space-y-4">
+              <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Four Upfront Decisions</h4>
               {['scope', 'coding_approach', 'theme_level', 'epistemology'].map((key) => (
-                <div key={key}>
-                  <label className="text-xs text-muted uppercase mb-1 block">{key.replace('_', ' ')}</label>
+                <div key={key} className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">{key.replace('_', ' ')}</label>
                   <select
                     defaultValue={project.analytic_decisions?.[key] || ''}
                     onChange={e => {
@@ -138,7 +147,7 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
                         data: { analytic_decisions: { ...current, [key]: e.target.value } }
                       })
                     }}
-                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    className="w-full rounded-xl bg-slate-950/50 border border-white/10 px-4 py-2.5 text-sm text-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition duration-200"
                   >
                     <option value="">Select...</option>
                     {key === 'scope' && <><option value="rich_description">Rich description of whole data set</option><option value="detailed_aspect">Detailed account of one aspect</option></>}
@@ -160,27 +169,29 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
     const notes = phaseState?.structured_data?.source_notes || []
     return (
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="border-b border-accent/10 px-4 py-3">
-          <h3 className="text-sm font-bold text-accent uppercase tracking-wider flex items-center gap-2">
-            <BookOpen size={14} /> Familiarisation Notes
+        <div className="border-b border-white/5 bg-slate-900/40 px-6 py-4">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+            <BookOpen size={16} /> Familiarisation Notes
           </h3>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {notes.length === 0 && (
-            <div className="text-sm text-muted">No familiarisation notes yet. Chat with the AI to generate them.</div>
+            <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/10 text-sm text-slate-500">
+              No familiarisation notes yet. Chat with the AI to generate them.
+            </div>
           )}
           {notes.map((note, i) => (
-            <div key={i} className="rounded-lg border border-accent/10 bg-bg p-3">
-              <div className="text-xs font-semibold text-accent mb-1">{note.name}</div>
-              <div className="text-sm text-text/90 whitespace-pre-wrap">{note.summary}</div>
+            <div key={i} className="rounded-2xl border border-white/5 bg-slate-900/40 p-5 glass-panel">
+              <div className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider mb-2">{note.name}</div>
+              <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{note.summary}</div>
             </div>
           ))}
           {phaseState?.structured_data?.initial_ideas && (
-            <div className="rounded-lg border border-accent/10 bg-bg p-3">
-              <div className="text-xs font-semibold text-accent mb-2">Initial Ideas / Hunches</div>
-              <ul className="list-disc list-inside text-sm text-text/90 space-y-1">
+            <div className="rounded-2xl border border-white/5 bg-slate-900/40 p-5 glass-panel mt-6">
+              <div className="text-[11px] font-bold text-violet-400 uppercase tracking-wider mb-3">Initial Ideas / Hunches</div>
+              <ul className="list-disc list-inside text-sm text-slate-300 space-y-2">
                 {phaseState.structured_data.initial_ideas.map((idea, i) => (
-                  <li key={i}>{idea}</li>
+                  <li key={i} className="pl-1">{idea}</li>
                 ))}
               </ul>
             </div>
@@ -195,34 +206,38 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
     const codes = phaseState?.structured_data?.codes || []
     return (
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="border-b border-accent/10 px-4 py-3">
-          <h3 className="text-sm font-bold text-accent uppercase tracking-wider flex items-center gap-2">
-            <Code size={14} /> Initial Codes
+        <div className="border-b border-white/5 bg-slate-900/40 px-6 py-4">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+            <Code size={16} /> Initial Codes
           </h3>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-6">
           {codes.length === 0 ? (
-            <div className="text-sm text-muted">No codes generated yet. Chat with the AI to start coding.</div>
+            <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-white/10 text-sm text-slate-500">
+              No codes generated yet. Chat with the AI to start coding.
+            </div>
           ) : (
-            <div className="space-y-3">
-              <div className="text-xs text-muted mb-2">{codes.length} codes generated</div>
+            <div className="space-y-4">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{codes.length} codes generated</div>
               {codes.map((code, i) => (
-                <div key={i} className="rounded-lg border border-accent/10 bg-bg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="rounded bg-accent/20 px-2 py-0.5 text-xs font-semibold text-accent">{code.name}</span>
-                    <span className="text-xs text-muted">{code.extracts?.length || 0} extracts</span>
+                <div key={i} className="rounded-2xl border border-white/5 bg-slate-900/40 p-5 glass-panel">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="rounded-lg bg-indigo-500/20 px-2.5 py-1 text-xs font-bold text-indigo-300 border border-indigo-500/20">{code.name}</span>
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{code.extracts?.length || 0} extracts</span>
                   </div>
                   {code.definition && (
-                    <div className="text-xs text-muted mb-2">{code.definition}</div>
+                    <div className="text-xs text-slate-400 mb-3 leading-relaxed">{code.definition}</div>
                   )}
-                  <div className="space-y-1">
+                  <div className="space-y-2 mt-4">
                     {(code.extracts || []).slice(0, 3).map((ex, j) => (
-                      <div key={j} className="rounded bg-bg2 px-2 py-1 text-xs text-text/80 border-l-2 border-accent/30">
-                        {ex.text?.substring(0, 120)}...
+                      <div key={j} className="rounded-xl bg-slate-950/50 px-4 py-3 text-xs text-slate-300 border-l-2 border-indigo-500/50 leading-relaxed shadow-inner shadow-black/10">
+                        {ex.text?.substring(0, 150)}...
                       </div>
                     ))}
                     {(code.extracts || []).length > 3 && (
-                      <div className="text-xs text-muted">+ {code.extracts.length - 3} more extracts</div>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-2">
+                        + {code.extracts.length - 3} more extracts
+                      </div>
                     )}
                   </div>
                 </div>
@@ -238,9 +253,9 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
   if (phase >= 4 && phase <= 6) {
     return (
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="border-b border-accent/10 px-4 py-3">
-          <h3 className="text-sm font-bold text-accent uppercase tracking-wider flex items-center gap-2">
-            <Layers size={14} /> Theme Builder
+        <div className="border-b border-white/5 bg-slate-900/40 px-6 py-4">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+            <Layers size={16} /> Theme Builder
           </h3>
         </div>
         <div className="flex-1 overflow-hidden">
@@ -258,28 +273,28 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
   if (phase === 7) {
     return (
       <div className="flex h-full flex-col overflow-hidden">
-        <div className="border-b border-accent/10 px-4 py-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-accent uppercase tracking-wider flex items-center gap-2">
-            <FileCheck size={14} /> Report
+        <div className="border-b border-white/5 bg-slate-900/40 px-6 py-4 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+            <FileCheck size={16} /> Report
           </h3>
           <div className="flex gap-2">
             <button
               onClick={() => reportMutation.mutate({ projectId: project.id, format: 'pdf' })}
               disabled={reportMutation.isLoading}
-              className="flex items-center gap-1 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-400 transition hover:bg-indigo-500/20 disabled:opacity-50"
             >
-              <Download size={12} /> PDF
+              <Download size={14} /> PDF
             </button>
             <button
               onClick={() => reportMutation.mutate({ projectId: project.id, format: 'docx' })}
               disabled={reportMutation.isLoading}
-              className="flex items-center gap-1 rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-medium text-accent transition hover:bg-accent/20 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 text-xs font-semibold text-indigo-400 transition hover:bg-indigo-500/20 disabled:opacity-50"
             >
-              <Download size={12} /> Word
+              <Download size={14} /> Word
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden bg-slate-900/20">
           <ReportViewer
             project={project}
             reports={reports || []}
@@ -290,7 +305,7 @@ function WorkspacePanel({ project, phaseState, onSendMessage }) {
     )
   }
 
-  return <div className="p-4 text-muted text-sm">Unknown phase</div>
+  return <div className="p-4 text-slate-500 text-sm">Unknown phase</div>
 }
 
 export default WorkspacePanel

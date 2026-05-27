@@ -57,33 +57,42 @@ class ReportService:
         for index, raw in enumerate(raw_themes):
             if isinstance(raw, str):
                 raw = {"name": raw}
-            if not isinstance(raw, dict) or not raw.get("name"):
+            if not isinstance(raw, dict):
+                continue
+                
+            theme_name = raw.get("name") or raw.get("theme") or raw.get("theme_name") or raw.get("title")
+            if not theme_name:
                 continue
 
-            theme_name = str(raw["name"])
             parent_name = raw.get("parent_name") or raw.get("parent")
             theme_type = raw.get("theme_type") or raw.get("type") or ("sub" if parent_name else "overarching")
             theme = ReportTheme(
                 id=f"theme-{index}",
-                name=theme_name,
-                definition=str(raw.get("definition") or ""),
+                name=str(theme_name),
+                definition=str(raw.get("definition") or raw.get("description") or ""),
                 theme_type=theme_type,
                 parent_name=parent_name,
             )
             themes.append(theme)
 
-            for sub_index, sub_theme in enumerate(raw.get("sub_themes") or []):
+            sub_themes_list = raw.get("sub_themes") or raw.get("subs") or []
+            for sub_index, sub_theme in enumerate(sub_themes_list):
                 if isinstance(sub_theme, str):
                     sub_theme = {"name": sub_theme}
-                if not isinstance(sub_theme, dict) or not sub_theme.get("name"):
+                if not isinstance(sub_theme, dict):
                     continue
+                
+                sub_name = sub_theme.get("name") or sub_theme.get("theme") or sub_theme.get("theme_name") or sub_theme.get("title")
+                if not sub_name:
+                    continue
+                    
                 themes.append(
                     ReportTheme(
                         id=f"theme-{index}-sub-{sub_index}",
-                        name=str(sub_theme["name"]),
-                        definition=str(sub_theme.get("definition") or ""),
+                        name=str(sub_name),
+                        definition=str(sub_theme.get("definition") or sub_theme.get("description") or ""),
                         theme_type="sub",
-                        parent_name=theme_name,
+                        parent_name=str(theme_name),
                     )
                 )
 

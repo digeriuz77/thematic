@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
-import { getProject, updateProject } from '../services/api'
+import { getProject, updateProject, updatePhaseState } from '../services/api'
 import { TreePine, Circle, GitBranch, Plus, X } from 'lucide-react'
 
 function ThemeBuilder({ projectId, phaseState, phase }) {
@@ -40,10 +40,27 @@ function ThemeBuilder({ projectId, phaseState, phase }) {
     })
   }
 
+  const saveMutation = useMutation(
+    (updatedData) => updatePhaseState(projectId, phase, updatedData),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['phaseState', projectId, phase])
+        alert('Themes successfully saved to the database!')
+      },
+      onError: (err) => {
+        alert('Failed to save themes: ' + err.message)
+      }
+    }
+  )
+
   const saveToProject = () => {
-    // This is a simplified manual edit - in production, you'd persist to backend
     const key = phase === 4 ? 'candidate_themes' : phase === 5 ? 'refined_themes' : 'final_themes'
-    // For now we just keep local state; real persistence would update phase_state.structured_data
+    const currentData = phaseState?.structured_data || {}
+    const updatedData = {
+      ...currentData,
+      [key]: themes
+    }
+    saveMutation.mutate(updatedData)
   }
 
   return (
@@ -125,7 +142,17 @@ function ThemeBuilder({ projectId, phaseState, phase }) {
         >
           <Plus size={12} /> Add Theme
         </button>
-        <span className="text-xs text-muted">{themes.length} themes</span>
+        
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted">{themes.length} themes</span>
+          <button
+            onClick={saveToProject}
+            disabled={saveMutation.isLoading}
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-3.5 py-1.5 text-xs font-semibold text-indigo-400 transition hover:bg-indigo-500/20 disabled:opacity-50"
+          >
+            {saveMutation.isLoading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </div>
   )
